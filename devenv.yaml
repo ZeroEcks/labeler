@@ -21,3 +21,4 @@ inputs:
 secretspec:
   enable: true
   profile: development
+  provider: env

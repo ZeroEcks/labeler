@@ -121,21 +121,13 @@ in
   packages = with pkgs; [ bacon ] ++ rustBuildDeps;
 
   # https://devenv.sh/languages/
-  # languages.rust.enable = true;
   languages.rust.enable = true;
 
   # Secrets
   env.STRIPE_SECRET_KEY = config.secretspec.secrets.STRIPE_SECRET_KEY;
 
-  # https://devenv.sh/processes/
-  processes.dev.exec = "${lib.getExe pkgs.bacon}";
-
   # https://devenv.sh/services/
   # services.postgres.enable = true;
-
-  # https://devenv.sh/basics/
-  enterShell = ''
-  '';
 
   # https://devenv.sh/tasks/
   # tasks = {
