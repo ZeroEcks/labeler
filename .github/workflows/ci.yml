@@ -1,0 +1,125 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  zizmor:
+    name: Scan workflows with zizmor
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Run zizmor
+        uses: zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054 # v0.6.2
+        with:
+          advanced-security: false
+
+  test:
+    name: devenv test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
+
+      - name: Set up the devenv Cachix cache
+        uses: cachix/cachix-action@3ba601ff5bbb07c7220846facfa2cd81eeee15a1 # v16
+        with:
+          name: devenv
+
+      - name: Install devenv
+        run: nix profile add nixpkgs#devenv
+
+      - name: Build the devenv shell and run clippy/tests
+        run: devenv test
+
+  container:
+    name: Build container images
+    needs: [zizmor, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
+
+      - name: Set up the devenv Cachix cache
+        uses: cachix/cachix-action@3ba601ff5bbb07c7220846facfa2cd81eeee15a1 # v16
+        with:
+          name: devenv
+
+      - name: Install devenv
+        run: nix profile add nixpkgs#devenv
+
+      - name: Compute image tags
+        id: image
+        run: |
+          repo="$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')"
+          echo "builder=ghcr.io/${repo}-builder" >> "$GITHUB_OUTPUT"
+          echo "app=ghcr.io/${repo}" >> "$GITHUB_OUTPUT"
+
+      - name: Build the devenv container (compiles labeler)
+        run: devenv container build builder
+
+      - name: Load the devenv container into the local Docker daemon
+        run: devenv container copy builder
+
+      - name: Build the Cloudron image on top of it
+        env:
+          APP_IMAGE: ${{ steps.image.outputs.app }}
+          SHA: ${{ github.sha }}
+        run: |
+          docker build \
+            --build-arg BUILDER_IMAGE=labeler-builder:latest \
+            -t "${APP_IMAGE}:${SHA}" \
+            -t "${APP_IMAGE}:latest" \
+            .
+
+      - name: Log in to GHCR
+        if: github.event_name == 'push'
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push the builder image
+        if: github.event_name == 'push'
+        env:
+          BUILDER_IMAGE: ${{ steps.image.outputs.builder }}
+          SHA: ${{ github.sha }}
+        run: |
+          docker tag labeler-builder:latest "${BUILDER_IMAGE}:${SHA}"
+          docker push "${BUILDER_IMAGE}:${SHA}"
+
+      - name: Push the Cloudron image
+        if: github.event_name == 'push'
+        env:
+          APP_IMAGE: ${{ steps.image.outputs.app }}
+          SHA: ${{ github.sha }}
+        run: |
+          docker push "${APP_IMAGE}:${SHA}"
+          docker push "${APP_IMAGE}:latest"

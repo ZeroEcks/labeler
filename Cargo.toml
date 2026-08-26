@@ -1,0 +1,32 @@
+[package]
+name = "labeler"
+version = "0.1.0"
+edition = "2024"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1}
+unsafe-derive-deserialize = "allow"
+
+[dependencies]
+# secrets for dev & prod
+secretspec = { version = "0.19.1", default-features = false }
+secretspec-derive = "0.19.1"
+# required directly by secretspec_derive::declare_secrets! generated code
+serde = { version = "1", features = ["derive"] }
+secrecy = "0.10"
+# async runtime for stripe + axum
+tokio = { version = "1", features = ["full"] }
+# stripe client
+async-stripe = "=1.0.0-rc.5"
+async-stripe-core = { version = "=1.0.0-rc.5", features = ["customer"] }
+async-stripe-shared = "=1.0.0-rc.8"
+async-stripe-billing = { version = "=1.0.0-rc.8", features = ["subscription"] }
+# date handling for the /report start_date query param
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
+# web framework
+axum = { version = "0.8.9", features = ["http2"] }
+# LaTeX -> PDF rendering for the /report endpoint
+tectonic = "0.17.0"
+
+[dev-dependencies]
+lopdf = { version = "0.44.0", default-features = false }
