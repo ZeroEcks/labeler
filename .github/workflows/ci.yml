@@ -59,6 +59,11 @@ jobs:
       - name: Install devenv
         run: nix profile add nixpkgs#devenv
 
+      - name: Cache cargo registry and target directory
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          cmd-format: devenv shell {0}
+
       - name: Build the devenv shell and run clippy/tests
         run: devenv test
 
