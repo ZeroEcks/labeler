@@ -8,6 +8,9 @@ on:
 
 permissions: {}
 
+env:
+  STRIPE_SECRET_KEY: "sk-dummy"
+
 jobs:
   zizmor:
     name: Scan workflows with zizmor
