@@ -62,7 +62,7 @@ jobs:
       - name: Cache cargo registry and target directory
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          cmd-format: devenv shell {0}
+          cmd-format: devenv shell -c {0}
 
       - name: Build the devenv shell and run clippy/tests
         run: devenv test
@@ -131,15 +131,6 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Push the builder image
-        if: github.event_name == 'push'
-        env:
-          BUILDER_IMAGE: ${{ steps.image.outputs.builder }}
-          SHA: ${{ github.sha }}
-        run: |
-          docker tag labeler-builder:latest "${BUILDER_IMAGE}:${SHA}"
-          docker push "${BUILDER_IMAGE}:${SHA}"
 
       - name: Push the Cloudron image
         if: github.event_name == 'push'
