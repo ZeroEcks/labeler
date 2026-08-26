@@ -342,7 +342,13 @@ fn escape_latex(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
     use stripe_shared::Address;
+
+    /// Tectonic writes to a shared on-disk cache and is not safe to call from
+    /// multiple threads at once.  All tests that invoke `tectonic::latex_to_pdf`
+    /// must hold this lock for the duration of the call.
+    static TECTONIC_LOCK: Mutex<()> = Mutex::new(());
 
     fn fake_customer(index: usize, name: Option<&str>, address: Option<Address>) -> Customer {
         Customer {
@@ -408,6 +414,7 @@ mod tests {
         assert!(latex.contains("\\newpage"));
         assert!(latex.contains("No Address \\& Co. 50\\%"));
 
+        let _lock = TECTONIC_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let pdf = tectonic::latex_to_pdf(latex).expect("tectonic should compile the label sheet");
         assert!(pdf.starts_with(b"%PDF"), "output is not a valid PDF");
 
@@ -424,6 +431,7 @@ mod tests {
     fn empty_customer_list_still_produces_a_valid_pdf() {
         let latex = render_customer_report_latex(&[]);
         assert!(latex.contains("No customers found."));
+        let _lock = TECTONIC_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let pdf = tectonic::latex_to_pdf(latex).expect("tectonic should compile an empty sheet");
         assert!(pdf.starts_with(b"%PDF"));
     }
