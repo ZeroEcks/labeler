@@ -216,12 +216,7 @@ in
       mv CHANGELOG.tmp CHANGELOG
 
       echo "==> [3/4] Registering v$VERSION in CloudronVersions.json"
-      # `cloudron versions add` only edits the local CloudronVersions.json
-      # catalog to point the new version at $IMAGE; it doesn't talk to a
-      # live Cloudron instance or the registry, so this can run before that
-      # image tag exists. Pushing the "v$VERSION" tag below (which the
-      # release workflow does once this script succeeds) is what makes CI
-      # build the labeler image and alias it to that tag.
+
       npx --yes "cloudron@''${CLOUDRON_CLI_VERSION:-latest}" versions add --image "$IMAGE" --state "$STATE"
 
       echo "==> [4/4] Committing and tagging v$VERSION"
@@ -229,9 +224,10 @@ in
       git commit -m "chore: release v$VERSION"
       git tag -a "v$VERSION" -m "v$VERSION"
 
-      echo
-      echo "Released v$VERSION locally. Push with: git push && git push origin v$VERSION"
-      echo "(pushing the tag is what triggers CI to build and publish $IMAGE)"
+      echo "Pushing tags to github to trigger builds."
+      sleep 5
+      git push origin --follow-tags
+      echo "Done!"
     '';
   };
 }

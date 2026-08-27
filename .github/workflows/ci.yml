@@ -7,6 +7,12 @@ on:
   pull_request:
   workflow_dispatch:
 
+# Ensure we run one at a time so that a separate tag push
+# doesn't beat the actual CI run.
+concurrency:
+  group: ci-${{ github.sha }}
+  cancel-in-progress: false
+
 permissions: {}
 
 env:
@@ -18,6 +24,7 @@ env:
 jobs:
   zizmor:
     name: Scan workflows with zizmor
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -33,6 +40,7 @@ jobs:
 
   test:
     name: devenv test
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -83,6 +91,7 @@ jobs:
 
   container:
     name: Build container images
+    if: ${{ !startsWith(github.ref, 'refs/tags/') }}
     needs: [zizmor, test]
     runs-on: ubuntu-latest
     permissions:
@@ -145,9 +154,33 @@ jobs:
             --option containers.labeler.version:string "${SHA}" \
             --registry docker://ghcr.io/zeroecks/
 
-      - name: Alias the release version tag
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+  alias-release-tag:
+    name: Alias the release version tag
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Confirm the commit's image was published
         env:
+          SHA: ${{ github.sha }}
+        run: |
+          image="ghcr.io/zeroecks/labeler:${SHA}"
+          if ! docker buildx imagetools inspect "$image" >/dev/null 2>&1; then
+            echo "$image not found. The CI run for this commit on main must succeed before its tag can be released." >&2
+            exit 1
+          fi
+
+      - name: Alias the release version tag
+        env:
+          SHA: ${{ github.sha }}
           RELEASE_VERSION: ${{ github.ref_name }}
         run: |
           docker buildx imagetools create \
