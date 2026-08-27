@@ -7,7 +7,7 @@
 }:
 
 let
-  inherit (lib) fileset hasPrefix;
+  inherit (lib) fileset;
   rustBuildDeps = with pkgs; [
     pkg-config
     openssl.dev
@@ -107,21 +107,13 @@ let
 
   labelerSrc = fileset.toSource {
     root = ./.;
-    fileset = fileset.intersection
-      (fileset.fromSource (lib.sources.cleanSource ./.))
-      (fileset.fileFilter (
-        file:
-        !(
-          file.hasExt "json"
-          || file.hasExt "md"
-          || file.hasExt "sh"
-          || file.hasExt "png"
-          || hasPrefix "." file.name
-          || hasPrefix "Cloudron" file.name
-          || hasPrefix "devenv" file.name
-          || hasPrefix "Docker" file.name
-        )
-      ) ./.);
+    fileset = fileset.unions [
+      ./Cargo.toml
+      ./Cargo.lock
+      ./secretspec.toml
+      ./src
+      ./templates
+    ];
   };
   
   labeler = config.languages.rust.import labelerSrc { inherit crateOverrides; };

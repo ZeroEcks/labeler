@@ -12,6 +12,7 @@ env:
   SECRETSPEC_PROVIDER: "env"
   SECRETSPEC_PROFILE: "default"
   STRIPE_SECRET_KEY: sk-dummy
+  DEVENV_MAX_JOBS: "2" # the docs seem to indicate this is 1/4 of the core count by default
 
 jobs:
   zizmor:
@@ -59,10 +60,12 @@ jobs:
           purge-last-accessed: P3D
           purge-primary-key: never
 
-      - name: Set up the devenv Cachix cache
-        uses: cachix/cachix-action@3ba601ff5bbb07c7220846facfa2cd81eeee15a1 # v16
+      - name: Set up Cachix
+        uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17
         with:
-          name: devenv
+          name: zeroecks-labeler
+          extraPullNames: devenv
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Install devenv
         run: nix profile add nixpkgs#devenv
@@ -106,27 +109,19 @@ jobs:
           purge-last-accessed: P3D
           purge-primary-key: never
 
-      - name: Set up the devenv Cachix cache
-        uses: cachix/cachix-action@3ba601ff5bbb07c7220846facfa2cd81eeee15a1 # v16
+      - name: Set up Cachix
+        uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17
         with:
-          name: devenv
+          name: zeroecks-labeler
+          extraPullNames: devenv
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
       - name: Install devenv
         run: nix profile add nixpkgs#devenv
 
-      - name: Cache cargo registry and target directory
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          cmd-format: devenv shell -c -- {0}
-
-      - name: Compute image tags
-        id: image
-        run: |
-          repo="$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')"
-          echo "app=ghcr.io/${repo}" >> "$GITHUB_OUTPUT"
-
       - name: Build the container
-        run: devenv container build labeler
+        # Copy puts it into the docker daemon as labeler:nightly
+        run: devenv container copy labeler
 
       - name: Log in to GHCR
         if: github.event_name == 'push'
@@ -136,12 +131,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push the Cloudron image
+      - name: Push the Cloudron nightly image
         if: github.event_name == 'push'
         env:
           APP_IMAGE: ${{ steps.image.outputs.app }}
           SHA: ${{ github.sha }}
         run: |
-          devenv container --registry docker://ghcr.io copy labeler
-          docker push "${APP_IMAGE}:${SHA}"
-          docker push "${APP_IMAGE}:latest"
+          export APP_REPO="ghcr.io/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')"
+          docker tag labeler:nightly \
+            -t "${APP_REPO}:${SHA}"  \
+            -t "${APP_REPO}:nightly" \
+            -t "${APP_REPO}:latest"  \
+            .
+
+          docker push "${APP_REPO}:${SHA}" 
+          docker push "${APP_REPO}:nightly"
+          docker push "${APP_REPO}:latest"
