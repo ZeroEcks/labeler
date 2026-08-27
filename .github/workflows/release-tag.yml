@@ -1,0 +1,96 @@
+name: Release tag
+
+on:
+  # zizmor: ignore[dangerous-triggers]
+  push:
+    tags: ["v*"]
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+
+permissions: {}
+
+jobs:
+  on-tag-push:
+    name: Push the release version tag (already-built commit)
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      packages: write
+    steps:
+      - name: Check CI status for this commit
+        id: ci
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          conclusion="$(gh run list --repo "${{ github.repository }}" --workflow CI --commit "$SHA" --json conclusion,status --jq '.[0] | if .status != "completed" then "" else .conclusion end')"
+          echo "conclusion=$conclusion" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        if: steps.ci.outputs.conclusion == 'success'
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push the release version tag
+        if: steps.ci.outputs.conclusion == 'success'
+        env:
+          SHA: ${{ github.sha }}
+          RELEASE_VERSION: ${{ github.ref_name }}
+        run: |
+          docker buildx imagetools create \
+            --tag "ghcr.io/zeroecks/labeler:${RELEASE_VERSION#v}" \
+            "ghcr.io/zeroecks/labeler:${SHA}"
+
+      - name: Fail if CI already concluded unsuccessfully
+        if: steps.ci.outputs.conclusion != '' && steps.ci.outputs.conclusion != 'success'
+        env:
+          SHA: ${{ github.sha }}
+          CONCLUSION: ${{ steps.ci.outputs.conclusion }}
+        run: |
+          echo "CI run for $SHA concluded with '$CONCLUSION'; not releasing." >&2
+          exit 1
+
+  on-ci-completed:
+    name: Push the release version tag (CI just finished)
+    if: github.event_name == 'workflow_run' && github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Find a release tag for this commit
+        id: tag
+        run: |
+          version="$(git tag --points-at HEAD | grep -m1 '^v[0-9]' || true)"
+          echo "version=${version#v}" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR
+        if: steps.tag.outputs.version != ''
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push the release version tag
+        if: steps.tag.outputs.version != ''
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha }}
+          RELEASE_VERSION: ${{ steps.tag.outputs.version }}
+        run: |
+          docker buildx imagetools create \
+            --tag "ghcr.io/zeroecks/labeler:${RELEASE_VERSION}" \
+            "ghcr.io/zeroecks/labeler:${SHA}"
