@@ -125,22 +125,8 @@ jobs:
           repo="$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')"
           echo "app=ghcr.io/${repo}" >> "$GITHUB_OUTPUT"
 
-      - name: Build the devenv container (compiles labeler)
-        run: devenv container build builder
-
-      - name: Load the devenv container into the local Docker daemon
-        run: devenv container copy builder
-
-      - name: Build the Cloudron image on top of it
-        env:
-          APP_IMAGE: ${{ steps.image.outputs.app }}
-          SHA: ${{ github.sha }}
-        run: |
-          docker build \
-            --build-arg BUILDER_IMAGE=labeler-builder:latest \
-            -t "${APP_IMAGE}:${SHA}" \
-            -t "${APP_IMAGE}:latest" \
-            .
+      - name: Build the container
+        run: devenv container build labeler
 
       - name: Log in to GHCR
         if: github.event_name == 'push'
@@ -156,5 +142,6 @@ jobs:
           APP_IMAGE: ${{ steps.image.outputs.app }}
           SHA: ${{ github.sha }}
         run: |
+          devenv container --registry docker://ghcr.io copy labeler
           docker push "${APP_IMAGE}:${SHA}"
           docker push "${APP_IMAGE}:latest"
