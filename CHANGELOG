@@ -1,3 +1,7 @@
+[0.3.2]
+* fix: release workflow was wrong (68782dd)
+* fix: setup-crane had the wrong if (5445ddf)
+
 [0.3.1]
 * fix: put secretspec.toml somewhere useful (617ef99)
 * fix: security refactor to use workflow_call because the other trigger was too scary looking (77b59ce)
