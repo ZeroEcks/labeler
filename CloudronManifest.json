@@ -11,7 +11,7 @@
   "packagerName": "Melody",
   "packagerUrl": "https://melody.blue",
   "contactEmail": "labeler@melody.blue",
-  "iconUrl": "https://avatars.githubusercontent.com/u/1106524?v=4",
+  "iconUrl": "https://raw.githubusercontent.com/ZeroEcks/labeler/v0.1.0/assets/labeler.png",
   "healthCheckPath": "/healthz",
   "mediaLinks": [
     "https://avatars.githubusercontent.com/u/1106524?v=4"

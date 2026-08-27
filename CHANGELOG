@@ -1,3 +1,21 @@
 [0.1.0]
+* feat: add release scripts (460b503)
+* fix: adjust tag and push commands to be valid (1d77b82)
+* feat: single step build (c2216c2)
+* fix: adjust container build to go straight from cloudron (f9bff66)
+* fix: zizmor (b8c28a9)
+* fix: zizmor (e054d69)
+* fix: typo stripe_secret_key (0e546ac)
+* fix: codeql zizmor configuration (b030264)
+* feat: codeql scanning (6a429d8)
+* fix: dependabot config (46e2def)
+* feat: enable advanced security (9897226)
+* fix: clean up devenv.nix, secretspec, update cargo, align versions of async-stripe, add cachix (b98929e)
+* feat: add dependabot (b3664d0)
+* fix: tweak caches to try and improve build times (ab49bd3)
+* fix: cargo command in cache (92bcea1)
+* fix: do not push the builder image (1b5fa33)
+* fix: generall fix the CI build and improve speed with caching etc. (3989ffd)
+* feat: initial commit (4a8a491)
 * Initial version
 
