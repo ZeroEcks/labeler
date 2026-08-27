@@ -1,3 +1,7 @@
+[0.3.1]
+* fix: put secretspec.toml somewhere useful (617ef99)
+* fix: security refactor to use workflow_call because the other trigger was too scary looking (77b59ce)
+
 [0.3.0]
 * feat: add a basic index page so users can see something (8e2b2ca)
 * feat: add logging (8e4aae4)
