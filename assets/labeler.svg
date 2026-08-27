@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="1024"
+   height="1024"
+   viewBox="0 0 512 512"
+   version="1.1"
+   id="svg1"
+   inkscape:version="1.4.4 (dcaf3e7d9e, 2026-05-05)"
+   sodipodi:docname="labeler.svg"
+   inkscape:export-filename="labeler.png"
+   inkscape:export-xdpi="96"
+   inkscape:export-ydpi="96"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="false"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     inkscape:zoom="1.2246429"
+     inkscape:cx="718.57684"
+     inkscape:cy="567.51239"
+     inkscape:window-width="3048"
+     inkscape:window-height="1660"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg1" />
+  <defs
+     id="defs1" />
+  <g
+     inkscape:groupmode="layer"
+     id="layer1"
+     inkscape:label="Envelope">
+    <rect
+       style="fill:#fff6d5;stroke:#000000;stroke-width:1.88976378;stroke-dasharray:none;stroke-opacity:1;stroke-linejoin:miter;paint-order:normal"
+       id="rect1"
+       width="427.87985"
+       height="260.4841"
+       x="42.060074"
+       y="125.75795" />
+    <path
+       style="fill:#fff6d5;stroke:#000000;stroke-width:1.88977;stroke-dasharray:none;stroke-opacity:1"
+       d="M 41.847873,125.78704 252.5226,253.33916 470.41138,125.62335"
+       id="path1"
+       sodipodi:nodetypes="ccc" />
+  </g>
+  <text
+     xml:space="preserve"
+     style="font-size:96px;writing-mode:lr-tb;direction:ltr;fill:#fff6d5;stroke:#000000;stroke-width:1.88977;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1;paint-order:normal"
+     x="52.260132"
+     y="362.14642"
+     id="text1"><tspan
+       sodipodi:role="line"
+       id="tspan1"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:96px;font-family:FreeMono;-inkscape-font-specification:FreeMono;fill:#000000;fill-opacity:1;stroke:none;stroke-width:1.88976"
+       x="52.260132"
+       y="362.14642">LABELER</tspan></text>
+</svg>

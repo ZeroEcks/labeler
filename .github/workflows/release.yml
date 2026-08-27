@@ -1,0 +1,92 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to release"
+        required: true
+        type: string
+      publish-state:
+        description: "Cloudron publish state"
+        required: false
+        type: choice
+        options:
+          - published
+          - testing
+        default: published
+
+permissions: {}
+
+env:
+  SECRETSPEC_PROVIDER: "env"
+  SECRETSPEC_PROFILE: "default"
+  STRIPE_SECRET_KEY: sk-dummy
+  DEVENV_MAX_JOBS: "2" # the docs seem to indicate this is 1/4 of the core count by default
+
+jobs:
+  release:
+    name: Cut a Cloudron release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+    env:
+      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          fetch-depth: 0 # full history + tags, needed for the changelog and tag checks
+          persist-credentials: true # needed to push the release commit/tag below
+
+      - name: Configure git identity
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Enable cache pushing
+        run: echo '{ cachix.push = "zeroecks-labeler"; }' > devenv.local.nix
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
+
+      - name: Restore and save Nix store
+        uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
+        with:
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock', '**/devenv.lock', '**/devenv.yaml') }}
+          restore-prefixes-first-match: nix-${{ runner.os }}-
+          gc-max-store-size-linux: 3G
+          purge: true
+          purge-last-accessed: P3D
+          purge-primary-key: never
+
+      - name: Set up Cachix
+        uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17
+        with:
+          name: zeroecks-labeler
+          extraPullNames: devenv
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+
+      - name: Install devenv
+        run: nix profile add nixpkgs#devenv
+
+      - name: Log in to GHCR
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cut the release
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+          RELEASE_PUBLISH_STATE: ${{ inputs.publish-state }}
+        run: devenv shell -c -- release "$RELEASE_VERSION" "$RELEASE_PUBLISH_STATE"
+
+      - name: Push release commit and tag to main
+        env:
+          RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          git push origin HEAD:main
+          git push origin "v$RELEASE_VERSION"

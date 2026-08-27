@@ -1,17 +1,21 @@
 {
   "id": "blue.melody.labeler",
   "version": "0.1.0",
-  "upstreamVersion": "",
-  "minBoxVersion": "9.0.0",
+  "upstreamVersion": "0.1.0",
+  "minBoxVersion": "9.1.0",
   "title": "Labeler",
   "author": "Melody Kelly",
   "description": "file://DESCRIPTION.md",
   "tagline": "Create labels from Stripe subscriptions",
   "website": "https://github.com/zeroecks/labeler",
+  "packagerName": "Melody",
+  "packagerUrl": "https://melody.blue",
   "contactEmail": "labeler@melody.blue",
-  "iconUrl": "https-logo.png",
+  "iconUrl": "https://avatars.githubusercontent.com/u/1106524?v=4",
   "healthCheckPath": "/healthz",
-  "mediaLinks": [],
+  "mediaLinks": [
+    "https://avatars.githubusercontent.com/u/1106524?v=4"
+  ],
   "httpPort": 3000,
   "tags": [
     "stripe"
@@ -19,9 +23,7 @@
   "changelog": "file://CHANGELOG",
   "postInstallMessage": "file://POSTINSTALL.md",
   "documentationUrl": "https://github.com/zeroecks/labeler",
-  "forumUrl": "",
   "addons": {
-    "localstorage": {},
     "proxyAuth": {}
   },
   "manifestVersion": 2

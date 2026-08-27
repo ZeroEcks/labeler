@@ -159,4 +159,79 @@ in
       sha256 = "sha256-mtlTI0S0t9nWZ68gKMl5ztLImN1bv6UGW9mV3YaAY/0=";
     };
   };
+
+  scripts.release = {
+    description = "Cut a new Cloudron release";
+    packages = [
+      pkgs.git
+      pkgs.jq
+      pkgs.nodejs
+    ];
+    exec = /* bash */ ''
+      set -euo pipefail
+
+      VERSION="''${1:?Usage: release <version> [publish-state]}"
+      STATE="''${2:-published}"
+      IMAGE="ghcr.io/zeroecks/labeler:''${VERSION}"
+      ICON_URL="https://raw.githubusercontent.com/ZeroEcks/labeler/v''${VERSION}/assets/labeler.png"
+
+      if [[ "$STATE" != "published" && "$STATE" != "testing" ]]; then
+        echo "publish-state must be 'published' or 'testing', got '$STATE'" >&2
+        exit 1
+      fi
+
+      cd "$DEVENV_ROOT"
+
+      if [[ -n "$(git status --porcelain)" ]]; then
+        echo "Working tree is dirty. Commit or stash changes before releasing." >&2
+        exit 1
+      fi
+
+      if git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+        echo "Tag v$VERSION already exists." >&2
+        exit 1
+      fi
+
+      echo "==> [1/4] Bumping Cargo.toml and Cargo.lock to $VERSION"
+      sed -i "0,/^version = \".*\"/s//version = \"$VERSION\"/" Cargo.toml
+      sed -i "/^name = \"labeler\"\$/{n;s/^version = \".*\"/version = \"$VERSION\"/}" Cargo.lock
+
+      echo "==> [2/4] Bumping CloudronManifest.json and prepending a CHANGELOG entry"
+      jq --arg v "$VERSION" --arg icon "$ICON_URL" \
+        '.version = $v | .upstreamVersion = $v | .iconUrl = $icon' \
+        CloudronManifest.json > CloudronManifest.json.tmp
+      mv CloudronManifest.json.tmp CloudronManifest.json
+
+      last_tag="$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)"
+      range="''${last_tag:+''${last_tag}..}HEAD"
+      commits="$(git log "$range" --no-merges --pretty='format:* %s (%h)')"
+      if [[ -z "$commits" ]]; then
+        commits="* No commits recorded since ''${last_tag:-the initial commit}."
+      fi
+
+      {
+        printf '[%s]\n%s\n\n' "$VERSION" "$commits"
+        cat CHANGELOG
+      } > CHANGELOG.tmp
+      mv CHANGELOG.tmp CHANGELOG
+
+      echo "==> [3/4] Registering v$VERSION in CloudronVersions.json"
+      # `cloudron versions add` only edits the local CloudronVersions.json
+      # catalog to point the new version at $IMAGE; it doesn't talk to a
+      # live Cloudron instance or the registry, so this can run before that
+      # image tag exists. Pushing the "v$VERSION" tag below (which the
+      # release workflow does once this script succeeds) is what makes CI
+      # build the labeler image and alias it to that tag.
+      npx --yes "cloudron@''${CLOUDRON_CLI_VERSION:-latest}" versions add --image "$IMAGE" --state "$STATE"
+
+      echo "==> [4/4] Committing and tagging v$VERSION"
+      git add Cargo.toml Cargo.lock CloudronManifest.json CHANGELOG CloudronVersions.json
+      git commit -m "chore: release v$VERSION"
+      git tag -a "v$VERSION" -m "v$VERSION"
+
+      echo
+      echo "Released v$VERSION locally. Push with: git push && git push origin v$VERSION"
+      echo "(pushing the tag is what triggers CI to build and publish $IMAGE)"
+    '';
+  };
 }
