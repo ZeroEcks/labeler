@@ -144,6 +144,42 @@
             "creationDate": "Thu, 27 Aug 2026 08:34:34 GMT",
             "ts": "Thu, 27 Aug 2026 08:34:34 GMT",
             "publishState": "published"
+        },
+        "0.1.5": {
+            "manifest": {
+                "id": "blue.melody.labeler",
+                "version": "0.1.5",
+                "upstreamVersion": "0.1.5",
+                "minBoxVersion": "9.1.0",
+                "title": "Labeler",
+                "author": "Melody Kelly",
+                "description": "## About\n\nThis app reads the Stripe API key and provides a button to generate a spreadsheet\nand printable labels for shipping items\n",
+                "tagline": "Create labels from Stripe subscriptions",
+                "website": "https://github.com/zeroecks/labeler",
+                "packagerName": "Melody",
+                "packagerUrl": "https://melody.blue",
+                "contactEmail": "labeler@melody.blue",
+                "iconUrl": "https://raw.githubusercontent.com/ZeroEcks/labeler/v0.1.5/assets/labeler.png",
+                "healthCheckPath": "/healthz",
+                "mediaLinks": [
+                    "https://avatars.githubusercontent.com/u/1106524?v=4"
+                ],
+                "httpPort": 3000,
+                "tags": [
+                    "stripe"
+                ],
+                "changelog": "* fix: container doesn't work and also release tag doesn't maintain digest (d4c2716)\n",
+                "postInstallMessage": "# Post Installation\n## Set the Environment Variables\n\nAfter installing, you will need to set the `STRIPE_SECRET_KEY`\n\n```bash\nexport LABELER_APP_ID=000-aaa # you can get this from the cloudron web interface\n# You need npm installed\nnpx cloudron env set --app $LABELER_APP_ID STRIPE_SECRET_KEY=sk_...\n```\n\n",
+                "documentationUrl": "https://github.com/zeroecks/labeler",
+                "addons": {
+                    "proxyAuth": {}
+                },
+                "manifestVersion": 2,
+                "dockerImage": "ghcr.io/zeroecks/labeler:0.1.5"
+            },
+            "creationDate": "Thu, 27 Aug 2026 09:00:33 GMT",
+            "ts": "Thu, 27 Aug 2026 09:00:33 GMT",
+            "publishState": "published"
         }
     }
 }
