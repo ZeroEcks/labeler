@@ -1,3 +1,6 @@
+[0.2.1]
+* fix: tectonic cache directory (d122f53)
+
 [0.2.0]
 * feat: add medialink that isn't a picture of mel (e335031)
 * chore: split out package into its own file for clenliness (b283adb)
