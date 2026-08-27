@@ -1,3 +1,6 @@
+[0.2.2]
+* fix: tectonic var needs to use if because it's not set by devenv (ac60ef7)
+
 [0.2.1]
 * fix: tectonic cache directory (d122f53)
 
