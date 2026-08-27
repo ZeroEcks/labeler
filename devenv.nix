@@ -33,8 +33,6 @@ in
 
   env.SECRETSPEC_PROFILE = lib.mkIf (config.container.isBuilding) "default";
   env.SECRETSPEC_PROVIDER = lib.mkIf (config.container.isBuilding) "env";
-  env.TECTONIC_CACHE_DIR = if config.container.isBuilding then "/tmp/tectonic" else "";
-  env.XDG_CACHE_HOME = if config.container.isBuilding then "/tmp/cache" else "";
 
   containers.labeler = {
     name = "labeler";
@@ -42,6 +40,7 @@ in
     version = "nightly";
     startupCommand = "${labeler}/bin/labeler";
     entrypoint = [ "${labeler}/bin/labeler" ];
+    workingDir = "/app/data";
     copyToRoot = [
       (pkgs.buildEnv {
         name = "labeler-env";
