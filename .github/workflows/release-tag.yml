@@ -42,9 +42,9 @@ jobs:
           SHA: ${{ github.sha }}
           RELEASE_VERSION: ${{ github.ref_name }}
         run: |
-          docker buildx imagetools create \
-            --tag "ghcr.io/zeroecks/labeler:${RELEASE_VERSION#v}" \
-            "ghcr.io/zeroecks/labeler:${SHA}"
+          docker pull "ghcr.io/zeroecks/labeler:${SHA}"
+          docker tag "ghcr.io/zeroecks/labeler:${SHA}" "ghcr.io/zeroecks/labeler:${RELEASE_VERSION#v}"
+          docker push "ghcr.io/zeroecks/labeler:${RELEASE_VERSION#v}"
 
       - name: Fail if CI already concluded unsuccessfully
         if: steps.ci.outputs.conclusion != '' && steps.ci.outputs.conclusion != 'success'
@@ -91,6 +91,6 @@ jobs:
           SHA: ${{ github.event.workflow_run.head_sha }}
           RELEASE_VERSION: ${{ steps.tag.outputs.version }}
         run: |
-          docker buildx imagetools create \
-            --tag "ghcr.io/zeroecks/labeler:${RELEASE_VERSION}" \
-            "ghcr.io/zeroecks/labeler:${SHA}"
+          docker pull "ghcr.io/zeroecks/labeler:${SHA}"
+          docker tag "ghcr.io/zeroecks/labeler:${SHA}" "ghcr.io/zeroecks/labeler:${RELEASE_VERSION}"
+          docker push "ghcr.io/zeroecks/labeler:${RELEASE_VERSION}"
