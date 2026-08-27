@@ -95,7 +95,8 @@ in
 
       echo "==> [2/4] Bumping CloudronManifest.json and prepending a CHANGELOG entry"
       jq --arg v "$VERSION" --arg icon "$ICON_URL" \
-        '.version = $v | .upstreamVersion = $v | .iconUrl = $icon' \
+        '.version = $v | .upstreamVersion = $v | .iconUrl = $icon
+         | .mediaLinks = (.mediaLinks | map(sub("/v[^/]+/"; "/v" + $v + "/")))' \
         CloudronManifest.json > CloudronManifest.json.tmp
       mv CloudronManifest.json.tmp CloudronManifest.json
 
