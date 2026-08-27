@@ -29,13 +29,8 @@ jobs:
           echo "conclusion=$conclusion" >> "$GITHUB_OUTPUT"
 
       - name: Set up Crane
-        if: steps.ci.outputs.conclusion == 'success'
-        uses: imjasonh/setup-crane@v0.4 # Installs crane CLI
-
-      - name: Authenticate to GHCR
-        if: steps.ci.outputs.conclusion == 'success'
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | crane auth login ghcr.io -u "${{ github.actor }}"
+        if: steps.tag.outputs.version != ''
+        uses: imjasonh/setup-crane@feee3b6bb0d4c68370f256a4502498c9227e5c6b # v0.7
 
       - name: Retag Image Remotely
         if: steps.ci.outputs.conclusion == 'success'
@@ -78,12 +73,7 @@ jobs:
 
       - name: Set up Crane
         if: steps.tag.outputs.version != ''
-        uses: imjasonh/setup-crane@v0.4 # Installs crane CLI
-
-      - name: Authenticate to GHCR
-        if: steps.tag.outputs.version != ''
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | crane auth login ghcr.io -u "${{ github.actor }}"
+        uses: imjasonh/setup-crane@feee3b6bb0d4c68370f256a4502498c9227e5c6b # v0.7
 
       - name: Retag Image Remotely
         if: steps.tag.outputs.version != ''
