@@ -33,6 +33,8 @@ in
 
   env.SECRETSPEC_PROFILE = lib.mkIf (config.container.isBuilding) "default";
   env.SECRETSPEC_PROVIDER = lib.mkIf (config.container.isBuilding) "env";
+  env.TECTONIC_CACHE_DIR = lib.mkIf (config.container.isBuilding) "/tmp/tectonic";
+
   containers.labeler = {
     name = "labeler";
     maxLayers = 8;
