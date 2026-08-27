@@ -12,47 +12,9 @@ on:
 permissions: {}
 
 jobs:
-  on-tag-push:
-    name: Push the release version tag (already-built commit)
-    if: github.event_name == 'push'
-    runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      packages: write
-    steps:
-      - name: Check CI status for this commit
-        id: ci
-        env:
-          GH_TOKEN: ${{ github.token }}
-          SHA: ${{ github.sha }}
-        run: |
-          conclusion="$(gh run list --repo "${{ github.repository }}" --workflow CI --commit "$SHA" --json conclusion,status --jq '.[0] | if .status != "completed" then "" else .conclusion end')"
-          echo "conclusion=$conclusion" >> "$GITHUB_OUTPUT"
-
-      - name: Set up Crane
-        if: steps.ci.outputs.conclusion == 'success'
-        uses: imjasonh/setup-crane@feee3b6bb0d4c68370f256a4502498c9227e5c6b # v0.7
-
-      - name: Retag Image Remotely
-        if: steps.ci.outputs.conclusion == 'success'
-        env:
-          SHA: ${{ github.sha }}
-          RELEASE_VERSION: ${{ github.ref_name }}
-        run: |
-          crane tag "ghcr.io/zeroecks/labeler:${SHA}" "${RELEASE_VERSION#v}"
-
-      - name: Fail if CI already concluded unsuccessfully
-        if: steps.ci.outputs.conclusion != '' && steps.ci.outputs.conclusion != 'success'
-        env:
-          SHA: ${{ github.sha }}
-          CONCLUSION: ${{ steps.ci.outputs.conclusion }}
-        run: |
-          echo "CI run for $SHA concluded with '$CONCLUSION'; not releasing." >&2
-          exit 1
-
-  on-ci-completed:
+  tag-release:
     name: Push the release version tag (CI just finished)
-    if: github.event_name == 'workflow_call'
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: read
