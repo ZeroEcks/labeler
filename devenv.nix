@@ -49,7 +49,10 @@ in
         ];
         pathsToLink = [ "/bin" ];
       })
-      ./secretspec.toml
+      (pkgs.runCommand "labeler-secretspec" { } ''
+        mkdir -p $out/app
+        cp ${./secretspec.toml} $out/app/secretspec.toml
+      '')
     ];
 
     fromImage = inputs.nix2container.packages.${pkgs.stdenv.system}.nix2container.pullImage {
