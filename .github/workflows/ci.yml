@@ -120,8 +120,10 @@ jobs:
         run: nix profile add nixpkgs#devenv
 
       - name: Build the container
-        # Copy puts it into the docker daemon as labeler:nightly
-        run: devenv container copy labeler
+        if: github.event_name != 'push'
+        run: |
+          devenv container build labeler \
+            --option containers.labeler.version:string ${SHA} \
 
       - name: Log in to GHCR
         if: github.event_name == 'push'
@@ -134,16 +136,8 @@ jobs:
       - name: Push the Cloudron nightly image
         if: github.event_name == 'push'
         env:
-          APP_IMAGE: ${{ steps.image.outputs.app }}
           SHA: ${{ github.sha }}
         run: |
-          export APP_REPO="ghcr.io/$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')"
-          docker tag labeler:nightly \
-            -t "${APP_REPO}:${SHA}"  \
-            -t "${APP_REPO}:nightly" \
-            -t "${APP_REPO}:latest"  \
-            .
-
-          docker push "${APP_REPO}:${SHA}" 
-          docker push "${APP_REPO}:nightly"
-          docker push "${APP_REPO}:latest"
+          devenv container copy labeler \
+            --option containers.labeler.version:string ${SHA} \
+            --registry docker://ghcr.io/zeroecks/
