@@ -45,11 +45,12 @@ jobs:
       - name: Restore and save Nix store
         uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
         with:
-          primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock', '**/devenv.lock', '**/devenv.yaml') }}
           restore-prefixes-first-match: nix-${{ runner.os }}-
-          gc-max-store-size-linux: 1G
+          gc-max-store-size-linux: 3G
           purge: true
-          purge-last-accessed: P3W
+          purge-last-accessed: P3D
+          purge-primary-key: never
 
       - name: Set up the devenv Cachix cache
         uses: cachix/cachix-action@3ba601ff5bbb07c7220846facfa2cd81eeee15a1 # v16
@@ -86,11 +87,12 @@ jobs:
       - name: Restore and save Nix store
         uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
         with:
-          primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock') }}
+          primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock', '**/devenv.lock', '**/devenv.yaml') }}
           restore-prefixes-first-match: nix-${{ runner.os }}-
-          gc-max-store-size-linux: 1G
+          gc-max-store-size-linux: 3G
           purge: true
-          purge-last-accessed: P3W
+          purge-last-accessed: P3D
+          purge-primary-key: never
 
       - name: Set up the devenv Cachix cache
         uses: cachix/cachix-action@3ba601ff5bbb07c7220846facfa2cd81eeee15a1 # v16
@@ -100,11 +102,15 @@ jobs:
       - name: Install devenv
         run: nix profile add nixpkgs#devenv
 
+      - name: Cache cargo registry and target directory
+        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          cmd-format: devenv shell -c -- {0}
+
       - name: Compute image tags
         id: image
         run: |
           repo="$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')"
-          echo "builder=ghcr.io/${repo}-builder" >> "$GITHUB_OUTPUT"
           echo "app=ghcr.io/${repo}" >> "$GITHUB_OUTPUT"
 
       - name: Build the devenv container (compiles labeler)
