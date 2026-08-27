@@ -19,8 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      # required to access CodeQL
-      security-events: read
+      security-events: write # required to upload the results to advanced security
     steps:
       - name: Checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
