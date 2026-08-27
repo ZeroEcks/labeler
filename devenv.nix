@@ -33,7 +33,7 @@ in
 
   env.SECRETSPEC_PROFILE = lib.mkIf (config.container.isBuilding) "default";
   env.SECRETSPEC_PROVIDER = lib.mkIf (config.container.isBuilding) "env";
-  env.TECTONIC_CACHE_DIR = lib.mkIf (config.container.isBuilding) "/tmp/tectonic";
+  env.TECTONIC_CACHE_DIR = if config.container.isBuilding then "/tmp/tectonic" else "";
 
   containers.labeler = {
     name = "labeler";
