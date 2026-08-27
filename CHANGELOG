@@ -1,3 +1,9 @@
+[0.3.0]
+* feat: add a basic index page so users can see something (8e2b2ca)
+* feat: add logging (8e4aae4)
+* fix: use local storage for blobs to save a lot of time on first run (88e6b1e)
+* fix: fontconfig cache (92c2e78)
+
 [0.2.2]
 * fix: tectonic var needs to use if because it's not set by devenv (ac60ef7)
 
