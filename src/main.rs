@@ -14,6 +14,9 @@ use stripe_billing::subscription::{ListSubscription, ListSubscriptionStatus};
 use stripe_billing::{Subscription, SubscriptionStatus};
 use stripe_core::Customer;
 use stripe_core::customer::ListCustomer;
+use tower_http::trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, TraceLayer};
+use tracing::Level;
+use tracing_subscriber::EnvFilter;
 
 secretspec_derive::declare_secrets!("secretspec.toml");
 
@@ -24,6 +27,10 @@ struct AppState {
 
 #[tokio::main]
 async fn main() {
+    tracing_subscriber::fmt()
+        .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .init();
+
     let secrets = SecretSpec::builder()
         .with_reason("stripe-ticket-printer boot")
         .load()
@@ -33,16 +40,27 @@ async fn main() {
         stripe: Arc::new(Client::new(secrets.secrets.stripe_secret_key)),
     };
 
-    let app = Router::new()
+    // `/healthz` is polled constantly by orchestrators and never carries
+    // useful information, so it's kept off the access-log router entirely.
+    let logged_routes = Router::new()
         .route("/", get(root))
-        .route("/healthz", get(healthz))
         .route("/report", get(report))
+        .layer(
+            TraceLayer::new_for_http()
+                .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
+                .on_request(DefaultOnRequest::new().level(Level::INFO))
+                .on_response(DefaultOnResponse::new().level(Level::INFO)),
+        );
+
+    let app = Router::new()
+        .route("/healthz", get(healthz))
+        .merge(logged_routes)
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000")
         .await
         .expect("failed to bind to 0.0.0.0:3000");
-    println!("listening on {}", listener.local_addr().unwrap());
+    tracing::info!(addr = %listener.local_addr().unwrap(), "listening");
     axum::serve(listener, app).await.expect("server error");
 }
 
@@ -84,6 +102,7 @@ struct ReportQuery {
 /// subscription active at any point between `start_date` and now (i.e.
 /// those eligible to be posted something), rendered from a LaTeX template
 /// via `tectonic`.
+#[tracing::instrument(skip(state), fields(start_date = %query.start_date))]
 async fn report(
     State(state): State<AppState>,
     Query(query): Query<ReportQuery>,
@@ -103,6 +122,7 @@ async fn report(
         .and_utc()
         .timestamp();
     let now = Utc::now().timestamp();
+    tracing::trace!(start_date, now, "resolved report window");
 
     let customers =
         customers_with_subscriptions_active_between(state.stripe.as_ref(), start_date, now)
@@ -113,8 +133,13 @@ async fn report(
                     format!("Stripe API call failed: {err}"),
                 )
             })?;
+    tracing::debug!(
+        customer_count = customers.len(),
+        "fetched customers with active subscriptions"
+    );
 
     let latex = render_customer_report_latex(&customers);
+    tracing::trace!(latex_len = latex.len(), "rendered label sheet latex");
 
     let pdf = tokio::task::spawn_blocking(move || tectonic::latex_to_pdf(latex))
         .await
@@ -130,6 +155,7 @@ async fn report(
                 format!("PDF generation failed: {err}"),
             )
         })?;
+    tracing::debug!(pdf_bytes = pdf.len(), "rendered pdf");
 
     Ok((
         [
@@ -145,6 +171,7 @@ async fn report(
 
 /// Fetches every subscription (across all pages, all statuses) and returns
 /// the distinct customers whose subscription overlapped `[start_date, now]`.
+#[tracing::instrument(skip(client))]
 async fn customers_with_subscriptions_active_between(
     client: &Client,
     start_date: i64,
@@ -153,6 +180,7 @@ async fn customers_with_subscriptions_active_between(
     let mut customers = Vec::new();
     let mut seen_customer_ids = HashSet::new();
     let mut starting_after: Option<String> = None;
+    let mut page_number = 0u32;
 
     loop {
         let mut request = ListSubscription::new()
@@ -168,6 +196,14 @@ async fn customers_with_subscriptions_active_between(
             .data
             .last()
             .map(|subscription| subscription.id.to_string());
+        page_number += 1;
+        tracing::trace!(
+            page_number,
+            page_size = page.data.len(),
+            has_more = page.has_more,
+            next_cursor = ?next_cursor,
+            "fetched subscription page"
+        );
 
         for subscription in &page.data {
             if !subscription_active_between(subscription, start_date, now) {
@@ -190,6 +226,11 @@ async fn customers_with_subscriptions_active_between(
         starting_after = Some(next_cursor);
     }
 
+    tracing::trace!(
+        customer_count = customers.len(),
+        pages_fetched = page_number,
+        "collected distinct customers with overlapping subscriptions"
+    );
     Ok(customers)
 }
 

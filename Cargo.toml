@@ -25,6 +25,10 @@ async-stripe-billing = { version = "=1.0.0-rc.8", features = ["subscription"] }
 chrono = { version = "0.4", default-features = false, features = ["clock"] }
 # web framework
 axum = { version = "0.8.9", features = ["http2"] }
+# structured logging: access-log middleware + trace-level spans/events
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tower-http = { version = "0.6", features = ["trace"] }
 # LaTeX -> PDF rendering for the /report endpoint
 tectonic = "0.17.0"
 
