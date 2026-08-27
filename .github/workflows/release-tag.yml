@@ -30,7 +30,7 @@ jobs:
           echo "conclusion=$conclusion" >> "$GITHUB_OUTPUT"
 
       - name: Set up Crane
-        if: steps.tag.outputs.version != ''
+        if: steps.ci.outputs.conclusion == 'success'
         uses: imjasonh/setup-crane@feee3b6bb0d4c68370f256a4502498c9227e5c6b # v0.7
 
       - name: Retag Image Remotely
