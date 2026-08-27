@@ -4,16 +4,16 @@ use std::sync::Arc;
 use axum::Router;
 use axum::extract::{Query, State};
 use axum::http::{StatusCode, header};
-use axum::response::IntoResponse;
+use axum::response::{Html, IntoResponse};
 use axum::routing::get;
-use chrono::{NaiveDate, Utc};
+use chrono::{DateTime, Months, NaiveDate, Utc};
 use serde::Deserialize;
 use std::collections::HashSet;
 use stripe::Client;
 use stripe_billing::subscription::{ListSubscription, ListSubscriptionStatus};
 use stripe_billing::{Subscription, SubscriptionStatus};
 use stripe_core::Customer;
-use stripe_core::customer::ListCustomer;
+use stripe_shared::Address;
 use tower_http::trace::{DefaultMakeSpan, DefaultOnRequest, DefaultOnResponse, TraceLayer};
 use tracing::Level;
 use tracing_subscriber::EnvFilter;
@@ -45,6 +45,7 @@ async fn main() {
     let logged_routes = Router::new()
         .route("/", get(root))
         .route("/report", get(report))
+        .route("/report/csv", get(report_csv))
         .layer(
             TraceLayer::new_for_http()
                 .make_span_with(DefaultMakeSpan::new().level(Level::INFO))
@@ -69,25 +70,30 @@ async fn healthz(State(_state): State<AppState>) -> Result<String, (StatusCode, 
     Ok("OK".to_string())
 }
 
-/// Demonstrates the Stripe API key is wired up correctly by listing a
-/// handful of customers from the connected Stripe account.
-async fn root(State(state): State<AppState>) -> Result<String, (StatusCode, String)> {
-    let customers = ListCustomer::new()
-        .limit(3)
-        .send(state.stripe.as_ref())
-        .await
-        .map_err(|err| {
-            (
-                StatusCode::BAD_GATEWAY,
-                format!("Stripe API call failed: {err}"),
-            )
-        })?;
+/// Serves the index page: a Pico CSS form for choosing a report start date
+/// (defaulting to exactly two months ago), a live PDF preview of the
+/// shipping-label report for that date, and links to download the PDF or a
+/// CSV export from `/report` and `/report/csv`.
+async fn root() -> impl IntoResponse {
+    let default_date = Utc::now()
+        .date_naive()
+        .checked_sub_months(Months::new(2))
+        .expect("subtracting two months from today is always a valid date")
+        .format("%Y-%m-%d")
+        .to_string();
+    let today = Utc::now().date_naive().format("%Y-%m-%d").to_string();
 
-    Ok(format!(
-        "Stripe API call succeeded: found {} customer(s).",
-        customers.data.len()
-    ))
+    Html(
+        INDEX_HTML_TEMPLATE
+            .replace("%%DEFAULT_DATE%%", &default_date)
+            .replace("%%TODAY%%", &today),
+    )
 }
+
+/// The index page template, loaded from disk at compile time.
+/// `%%DEFAULT_DATE%%` (two months before today) and `%%TODAY%%` are filled
+/// in by [`root`].
+const INDEX_HTML_TEMPLATE: &str = include_str!("../templates/index.html");
 
 /// Query parameters for `/report`. `start_date` (`YYYY-MM-DD`) marks the
 /// beginning of the reporting period; the period runs from that date until
@@ -107,32 +113,19 @@ async fn report(
     State(state): State<AppState>,
     Query(query): Query<ReportQuery>,
 ) -> Result<impl IntoResponse, (StatusCode, String)> {
-    let start_date = NaiveDate::parse_from_str(&query.start_date, "%Y-%m-%d")
-        .map_err(|_| {
-            (
-                StatusCode::BAD_REQUEST,
-                format!(
-                    "invalid start_date {:?}: expected YYYY-MM-DD",
-                    query.start_date
-                ),
-            )
-        })?
-        .and_hms_opt(0, 0, 0)
-        .expect("midnight is always a valid time")
-        .and_utc()
-        .timestamp();
+    let start_date = parse_start_date(&query.start_date)?;
     let now = Utc::now().timestamp();
     tracing::trace!(start_date, now, "resolved report window");
 
-    let customers =
-        customers_with_subscriptions_active_between(state.stripe.as_ref(), start_date, now)
-            .await
-            .map_err(|err| {
-                (
-                    StatusCode::BAD_GATEWAY,
-                    format!("Stripe API call failed: {err}"),
-                )
-            })?;
+    let subscriptions = subscriptions_active_between(state.stripe.as_ref(), start_date, now)
+        .await
+        .map_err(|err| {
+            (
+                StatusCode::BAD_GATEWAY,
+                format!("Stripe API call failed: {err}"),
+            )
+        })?;
+    let customers = distinct_customers(&subscriptions);
     tracing::debug!(
         customer_count = customers.len(),
         "fetched customers with active subscriptions"
@@ -169,16 +162,72 @@ async fn report(
     ))
 }
 
-/// Fetches every subscription (across all pages, all statuses) and returns
-/// the distinct customers whose subscription overlapped `[start_date, now]`.
+/// Exports the same customers as [`report`], one row per subscription that
+/// overlapped `[start_date, now]`, as CSV with columns
+/// `name,address,sub_start_date,sub_amount`. `sub_amount` is the
+/// subscription's per-cycle total (sum of `unit_amount * quantity` across
+/// its items) in major currency units (e.g. dollars, not cents).
+#[tracing::instrument(skip(state), fields(start_date = %query.start_date))]
+async fn report_csv(
+    State(state): State<AppState>,
+    Query(query): Query<ReportQuery>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    let start_date = parse_start_date(&query.start_date)?;
+    let now = Utc::now().timestamp();
+    tracing::trace!(start_date, now, "resolved report window");
+
+    let subscriptions = subscriptions_active_between(state.stripe.as_ref(), start_date, now)
+        .await
+        .map_err(|err| {
+            (
+                StatusCode::BAD_GATEWAY,
+                format!("Stripe API call failed: {err}"),
+            )
+        })?;
+    tracing::debug!(
+        subscription_count = subscriptions.len(),
+        "fetched subscriptions active in period"
+    );
+
+    let csv = render_subscriptions_csv(&subscriptions);
+
+    Ok((
+        [
+            (header::CONTENT_TYPE, "text/csv; charset=utf-8"),
+            (
+                header::CONTENT_DISPOSITION,
+                "attachment; filename=\"subscriptions.csv\"",
+            ),
+        ],
+        csv,
+    ))
+}
+
+/// Parses a `YYYY-MM-DD` `start_date` query value into a Unix timestamp at
+/// midnight UTC on that date.
+fn parse_start_date(raw: &str) -> Result<i64, (StatusCode, String)> {
+    Ok(NaiveDate::parse_from_str(raw, "%Y-%m-%d")
+        .map_err(|_| {
+            (
+                StatusCode::BAD_REQUEST,
+                format!("invalid start_date {raw:?}: expected YYYY-MM-DD"),
+            )
+        })?
+        .and_hms_opt(0, 0, 0)
+        .expect("midnight is always a valid time")
+        .and_utc()
+        .timestamp())
+}
+
+/// Fetches every subscription (across all pages, all statuses) that
+/// overlapped `[start_date, now]`.
 #[tracing::instrument(skip(client))]
-async fn customers_with_subscriptions_active_between(
+async fn subscriptions_active_between(
     client: &Client,
     start_date: i64,
     now: i64,
-) -> Result<Vec<Customer>, stripe::StripeError> {
-    let mut customers = Vec::new();
-    let mut seen_customer_ids = HashSet::new();
+) -> Result<Vec<Subscription>, stripe::StripeError> {
+    let mut subscriptions = Vec::new();
     let mut starting_after: Option<String> = None;
     let mut page_number = 0u32;
 
@@ -205,17 +254,11 @@ async fn customers_with_subscriptions_active_between(
             "fetched subscription page"
         );
 
-        for subscription in &page.data {
-            if !subscription_active_between(subscription, start_date, now) {
-                continue;
-            }
-            let Some(customer) = subscription.customer.as_object() else {
-                continue;
-            };
-            if seen_customer_ids.insert(customer.id.clone()) {
-                customers.push(customer.clone());
-            }
-        }
+        subscriptions.extend(
+            page.data
+                .into_iter()
+                .filter(|subscription| subscription_active_between(subscription, start_date, now)),
+        );
 
         if !page.has_more {
             break;
@@ -227,11 +270,28 @@ async fn customers_with_subscriptions_active_between(
     }
 
     tracing::trace!(
-        customer_count = customers.len(),
+        subscription_count = subscriptions.len(),
         pages_fetched = page_number,
-        "collected distinct customers with overlapping subscriptions"
+        "collected subscriptions overlapping reporting period"
     );
-    Ok(customers)
+    Ok(subscriptions)
+}
+
+/// Extracts the distinct customers referenced by `subscriptions` (in
+/// first-seen order), skipping any subscription whose customer failed to
+/// expand.
+fn distinct_customers(subscriptions: &[Subscription]) -> Vec<Customer> {
+    let mut seen_customer_ids = HashSet::new();
+    let mut customers = Vec::new();
+    for subscription in subscriptions {
+        let Some(customer) = subscription.customer.as_object() else {
+            continue;
+        };
+        if seen_customer_ids.insert(customer.id.clone()) {
+            customers.push(customer.clone());
+        }
+    }
+    customers
 }
 
 /// A subscription counts as active at some point during `[period_start,
@@ -381,6 +441,98 @@ fn escape_latex(input: &str) -> String {
         }
     }
     out
+}
+
+/// Renders `subscriptions` as CSV with columns
+/// `name,address,sub_start_date,sub_amount`, one row per subscription (so a
+/// customer with multiple overlapping subscriptions gets multiple rows).
+/// Subscriptions whose customer failed to expand are skipped.
+fn render_subscriptions_csv(subscriptions: &[Subscription]) -> String {
+    let mut csv = String::from("name,address,sub_start_date,sub_amount\n");
+    for subscription in subscriptions {
+        let Some(customer) = subscription.customer.as_object() else {
+            continue;
+        };
+        let name = customer
+            .name
+            .as_deref()
+            .or(customer.email.as_deref())
+            .unwrap_or(customer.id.as_str());
+        let address = customer
+            .address
+            .as_ref()
+            .map(format_address_single_line)
+            .unwrap_or_default();
+
+        let _ = writeln!(
+            csv,
+            "{},{},{},{}",
+            csv_field(name),
+            csv_field(&address),
+            csv_field(&format_date(subscription.start_date)),
+            csv_field(&subscription_amount(subscription)),
+        );
+    }
+    csv
+}
+
+/// Renders a customer's address as a single comma-separated line (street
+/// lines, city, state, postal code, country), for the CSV export.
+fn format_address_single_line(address: &Address) -> String {
+    [
+        non_empty(address.line1.as_deref()),
+        non_empty(address.line2.as_deref()),
+        non_empty(address.city.as_deref()),
+        non_empty(address.state.as_deref()),
+        non_empty(address.postal_code.as_deref()),
+        non_empty(address.country.as_deref()),
+    ]
+    .into_iter()
+    .flatten()
+    .collect::<Vec<_>>()
+    .join(", ")
+}
+
+/// A subscription's per-cycle total: the sum of `unit_amount * quantity`
+/// across its line items, converted from the minor currency unit (e.g.
+/// cents) to major units (e.g. dollars) and formatted with two decimal
+/// places.
+#[allow(
+    clippy::cast_precision_loss,
+    reason = "currency amounts are always far below 2^52 cents"
+)]
+fn subscription_amount(subscription: &Subscription) -> String {
+    let minor_units: i64 = subscription
+        .items
+        .data
+        .iter()
+        .map(|item| {
+            let quantity = i64::try_from(item.quantity.unwrap_or(1)).unwrap_or(i64::MAX);
+            item.price
+                .unit_amount
+                .unwrap_or(0)
+                .saturating_mul(quantity)
+        })
+        .sum();
+    format!("{:.2}", minor_units as f64 / 100.0)
+}
+
+/// Formats a Unix timestamp as a `YYYY-MM-DD` UTC date, for the CSV export.
+fn format_date(timestamp: i64) -> String {
+    DateTime::<Utc>::from_timestamp(timestamp, 0)
+        .map(|datetime| datetime.format("%Y-%m-%d").to_string())
+        .unwrap_or_default()
+}
+
+/// Escapes a value for embedding as a single CSV field: wraps it in quotes
+/// (doubling any embedded quotes) if it contains a comma, quote, or
+/// newline.
+fn csv_field(value: &str) -> String {
+    if value.contains([',', '"', '\n', '\r']) {
+        format!("\"{}\"", value.replace('"', "\"\""))
+    } else {
+        value.to_string()
+    }
 }
 
 #[cfg(test)]

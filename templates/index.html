@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Labler: Print Shipping Labels</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css" />
+</head>
+
+<body>
+  <main class="container">
+    <h1>Labler: Print Shipping Labels</h1>
+    <p>
+      Shipping labels for customers with a subscription active any time
+      since the start date below.
+    </p>
+
+    <label for="start_date">
+      Report start date
+      <input type="date" id="start_date" name="start_date" value="%%DEFAULT_DATE%%" max="%%TODAY%%" />
+    </label>
+
+    <div class="grid">
+      <a role="button" id="get-report" download="shipping-labels.pdf">Get report</a>
+      <a role="button" class="secondary" id="export-csv" download="subscriptions.csv">Export CSV</a>
+    </div>
+
+    <h2>Preview</h2>
+    <embed id="preview" type="application/pdf" width="100%" height="800" />
+  </main>
+
+  <script>
+    const dateInput = document.getElementById("start_date");
+    const getReport = document.getElementById("get-report");
+    const exportCsv = document.getElementById("export-csv");
+    const preview = document.getElementById("preview");
+
+    function update() {
+      const startDate = encodeURIComponent(dateInput.value);
+      getReport.href = `/report?start_date=${startDate}`;
+      exportCsv.href = `/report/csv?start_date=${startDate}`;
+      preview.src = `/report?start_date=${startDate}`;
+    }
+
+    dateInput.addEventListener("change", update);
+    update();
+  </script>
+</body>
+
+</html>
