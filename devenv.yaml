@@ -20,5 +20,5 @@ inputs:
     url: github:cachix/devenv-nixpkgs/rolling
 secretspec:
   enable: true
-  profile: development
-  provider: env
+  profile: default
+  cachix_auth_token: true

@@ -17,9 +17,9 @@ secrecy = "0.10"
 # async runtime for stripe + axum
 tokio = { version = "1", features = ["full"] }
 # stripe client
-async-stripe = "=1.0.0-rc.5"
-async-stripe-core = { version = "=1.0.0-rc.5", features = ["customer"] }
-async-stripe-shared = "=1.0.0-rc.8"
+async-stripe = "=1.0.0-rc.8"
+async-stripe-core = { version = "=1.0.0-rc.8", features = ["customer"] }
+async-stripe-shared = { version = "=1.0.0-rc.8" }
 async-stripe-billing = { version = "=1.0.0-rc.8", features = ["subscription"] }
 # date handling for the /report start_date query param
 chrono = { version = "0.4", default-features = false, features = ["clock"] }

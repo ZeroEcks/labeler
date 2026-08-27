@@ -9,7 +9,9 @@ on:
 permissions: {}
 
 env:
-  STRIPE_SECRET_KEY: "sk-dummy"
+  SECRETSPEC_PROVIDER: "env"
+  SECRETSPEC_PROFILE: "default"
+  STRIPE_API_KEY: sk-dummy
 
 jobs:
   zizmor:
@@ -33,11 +35,17 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+    env:
+      CACHIX_API_TOKEN: ${{ secrets.CACHIX_API_TOKEN }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           persist-credentials: false
+
+      - name: Enable cache pushing
+        run: echo '{ cachix.push = "zeroecks-labeler"; }' > devenv.local.nix
 
       - name: Install Nix
         uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
@@ -75,11 +83,16 @@ jobs:
     permissions:
       contents: read
       packages: write
+    env:
+      CACHIX_API_TOKEN: ${{ secrets.CACHIX_API_TOKEN }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           persist-credentials: false
+
+      - name: Enable cache pushing
+        run: echo '{ cachix.push = "zeroecks-labeler"; }' > devenv.local.nix
 
       - name: Install Nix
         uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31

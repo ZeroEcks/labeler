@@ -11,8 +11,9 @@ use serde::Deserialize;
 use std::collections::HashSet;
 use stripe::Client;
 use stripe_billing::subscription::{ListSubscription, ListSubscriptionStatus};
+use stripe_billing::{Subscription, SubscriptionStatus};
+use stripe_core::Customer;
 use stripe_core::customer::ListCustomer;
-use stripe_shared::{Customer, Subscription, SubscriptionStatus};
 
 secretspec_derive::declare_secrets!("secretspec.toml");
 
@@ -164,7 +165,10 @@ async fn customers_with_subscriptions_active_between(
         }
 
         let page = request.send(client).await?;
-        let next_cursor = page.data.last().map(|subscription| subscription.id.to_string());
+        let next_cursor = page
+            .data
+            .last()
+            .map(|subscription| subscription.id.to_string());
 
         for subscription in &page.data {
             if !subscription_active_between(subscription, start_date, now) {
@@ -364,7 +368,7 @@ mod tests {
             description: None,
             discount: None,
             email: Some(format!("customer{index}@example.com")),
-            id: stripe_shared::CustomerId::from(format!("cus_test{index}").as_str()),
+            id: stripe_core::CustomerId::from(format!("cus_test{index}").as_str()),
             individual_name: None,
             invoice_credit_balance: None,
             invoice_prefix: None,
