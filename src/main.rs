@@ -25,7 +25,6 @@ struct AppState {
 #[tokio::main]
 async fn main() {
     let secrets = SecretSpec::builder()
-        .with_provider("env://")
         .with_reason("stripe-ticket-printer boot")
         .load()
         .expect("failed to load secrets from secretspec");

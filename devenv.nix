@@ -145,14 +145,20 @@ in
 
   containers.labeler = {
     name = "labeler";
+    maxLayers = 8;
     version = "nightly";
     startupCommand = "${labeler}/bin/labeler";
     entrypoint = [ "${labeler}/bin/labeler" ];
-    copyToRoot = pkgs.buildEnv {
-      name = "labeler-env";
-      paths = [ labeler ];
-      pathsToLink = [ "/bin" ];
-    };
+    copyToRoot = [
+      (pkgs.buildEnv {
+        name = "labeler-env";
+        paths = [
+          labeler
+        ];
+        pathsToLink = [ "/bin" ];
+      })
+      ./secretspec.toml
+    ];
     fromImage = inputs.nix2container.packages.${pkgs.stdenv.system}.nix2container.pullImage {
       imageName = "docker.io/cloudron/base";
       imageDigest = "sha256:1c0666c9abe9e2090d33686826d4e97769b799124573118d41e0d7485135748e";

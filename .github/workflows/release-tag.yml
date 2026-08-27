@@ -28,23 +28,22 @@ jobs:
           conclusion="$(gh run list --repo "${{ github.repository }}" --workflow CI --commit "$SHA" --json conclusion,status --jq '.[0] | if .status != "completed" then "" else .conclusion end')"
           echo "conclusion=$conclusion" >> "$GITHUB_OUTPUT"
 
-      - name: Log in to GHCR
+      - name: Set up Crane
         if: steps.ci.outputs.conclusion == 'success'
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+        uses: imjasonh/setup-crane@v0.4 # Installs crane CLI
 
-      - name: Push the release version tag
+      - name: Authenticate to GHCR
+        if: steps.ci.outputs.conclusion == 'success'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | crane auth login ghcr.io -u "${{ github.actor }}"
+
+      - name: Retag Image Remotely
         if: steps.ci.outputs.conclusion == 'success'
         env:
           SHA: ${{ github.sha }}
           RELEASE_VERSION: ${{ github.ref_name }}
         run: |
-          docker pull "ghcr.io/zeroecks/labeler:${SHA}"
-          docker tag "ghcr.io/zeroecks/labeler:${SHA}" "ghcr.io/zeroecks/labeler:${RELEASE_VERSION#v}"
-          docker push "ghcr.io/zeroecks/labeler:${RELEASE_VERSION#v}"
+          crane tag "ghcr.io/zeroecks/labeler:${SHA}" "${RELEASE_VERSION#v}"
 
       - name: Fail if CI already concluded unsuccessfully
         if: steps.ci.outputs.conclusion != '' && steps.ci.outputs.conclusion != 'success'
@@ -77,20 +76,19 @@ jobs:
           version="$(git tag --points-at HEAD | grep -m1 '^v[0-9]' || true)"
           echo "version=${version#v}" >> "$GITHUB_OUTPUT"
 
-      - name: Log in to GHCR
+      - name: Set up Crane
         if: steps.tag.outputs.version != ''
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+        uses: imjasonh/setup-crane@v0.4 # Installs crane CLI
 
-      - name: Push the release version tag
+      - name: Authenticate to GHCR
+        if: steps.tag.outputs.version != ''
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | crane auth login ghcr.io -u "${{ github.actor }}"
+
+      - name: Retag Image Remotely
         if: steps.tag.outputs.version != ''
         env:
           SHA: ${{ github.event.workflow_run.head_sha }}
           RELEASE_VERSION: ${{ steps.tag.outputs.version }}
         run: |
-          docker pull "ghcr.io/zeroecks/labeler:${SHA}"
-          docker tag "ghcr.io/zeroecks/labeler:${SHA}" "ghcr.io/zeroecks/labeler:${RELEASE_VERSION}"
-          docker push "ghcr.io/zeroecks/labeler:${RELEASE_VERSION}"
+          crane tag "ghcr.io/zeroecks/labeler:${SHA}" "${RELEASE_VERSION}"
