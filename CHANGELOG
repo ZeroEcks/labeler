@@ -1,3 +1,7 @@
+[0.2.0]
+* feat: add medialink that isn't a picture of mel (e335031)
+* chore: split out package into its own file for clenliness (b283adb)
+
 [0.1.6]
 * fix: zizmor didn't like that (4280502)
 
