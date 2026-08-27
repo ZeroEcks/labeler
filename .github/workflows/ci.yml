@@ -49,7 +49,7 @@ jobs:
         uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
 
       - name: Restore and save Nix store
-        # zizmor: ignore[cache-poisoning] cache key is content-addressed by nix file hashes; same accepted risk as the existing main-branch publish path, now also flagged for tag pushes
+        # zizmor: ignore[cache-poisoning]
         uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
         with:
           primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock', '**/devenv.lock', '**/devenv.yaml') }}
@@ -70,7 +70,7 @@ jobs:
         run: nix profile add nixpkgs#devenv
 
       - name: Cache cargo registry and target directory
-        # zizmor: ignore[cache-poisoning] cache key is content-addressed by Cargo.lock; same accepted risk as the Nix store cache above
+        # zizmor: ignore[cache-poisoning] only used for tests
         uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           cmd-format: devenv shell -c -- {0}
@@ -101,7 +101,7 @@ jobs:
         uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
 
       - name: Restore and save Nix store
-        # zizmor: ignore[cache-poisoning] same accepted risk as the test job's Nix store cache above
+        # zizmor: ignore[cache-poisoning]
         uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
         with:
           primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock', '**/devenv.lock', '**/devenv.yaml') }}
@@ -141,3 +141,14 @@ jobs:
           devenv container copy labeler \
             --option containers.labeler.version:string "${SHA}" \
             --registry docker://ghcr.io/zeroecks/
+
+  retag:
+    name: Retag release version (if tagged)
+    needs: [container]
+    if: github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+    uses: ./.github/workflows/release-tag.yml
+    with:
+      sha: ${{ github.sha }}

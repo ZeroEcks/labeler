@@ -1,12 +1,13 @@
 name: Release tag
 
 on:
-  # zizmor: ignore[dangerous-triggers]
   push:
     tags: ["v*"]
-  workflow_run:
-    workflows: ["CI"]
-    types: [completed]
+  workflow_call:
+    inputs:
+      sha:
+        required: true
+        type: string
 
 permissions: {}
 
@@ -51,7 +52,7 @@ jobs:
 
   on-ci-completed:
     name: Push the release version tag (CI just finished)
-    if: github.event_name == 'workflow_run' && github.event.workflow_run.event == 'push' && github.event.workflow_run.conclusion == 'success'
+    if: github.event_name == 'workflow_call'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -60,7 +61,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
-          ref: ${{ github.event.workflow_run.head_sha }}
+          ref: ${{ inputs.sha }}
           fetch-depth: 0
           fetch-tags: true
           persist-credentials: false
@@ -78,7 +79,7 @@ jobs:
       - name: Retag Image Remotely
         if: steps.tag.outputs.version != ''
         env:
-          SHA: ${{ github.event.workflow_run.head_sha }}
+          SHA: ${{ inputs.sha }}
           RELEASE_VERSION: ${{ steps.tag.outputs.version }}
         run: |
           crane tag "ghcr.io/zeroecks/labeler:${SHA}" "${RELEASE_VERSION}"
