@@ -6,12 +6,6 @@ on:
 
 permissions: {}
 
-env:
-  SECRETSPEC_PROVIDER: "env"
-  SECRETSPEC_PROFILE: "default"
-  STRIPE_SECRET_KEY: sk-dummy
-  DEVENV_MAX_JOBS: "2" # the docs seem to indicate this is 1/4 of the core count by default
-
 jobs:
   zizmor:
     name: Scan workflows with zizmor
@@ -29,12 +23,10 @@ jobs:
         uses: zizmorcore/zizmor-action@3dc1ecc9bcb9e94e9b2c709687979e1298497054 # v0.6.2
 
   test:
-    name: devenv test
+    name: flake check
     runs-on: ubuntu-latest
     permissions:
       contents: read
-    env:
-      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
     steps:
       - name: Checkout repository
@@ -42,90 +34,41 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Enable cache pushing
-        run: echo '{ cachix.push = "zeroecks-labeler"; }' > devenv.local.nix
-
       - name: Install Nix
         uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
-
-      - name: Restore and save Nix store
-        # zizmor: ignore[cache-poisoning]
-        uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
-        with:
-          primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock', '**/devenv.lock', '**/devenv.yaml') }}
-          restore-prefixes-first-match: nix-${{ runner.os }}-
-          gc-max-store-size-linux: 3G
-          purge: true
-          purge-last-accessed: P3D
-          purge-primary-key: never
 
       - name: Set up Cachix
         uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17
         with:
           name: zeroecks-labeler
-          extraPullNames: devenv
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
 
-      - name: Install devenv
-        run: nix profile add nixpkgs#devenv
-
-      - name: Cache cargo registry and target directory
-        # zizmor: ignore[cache-poisoning] only used for tests
-        uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          cmd-format: devenv shell -c -- {0}
-
-      - name: Build the devenv shell and run clippy/tests
-        run: devenv test
+      - name: Check flake (formatting, tests)
+        run: |
+          nix flake check
 
   container:
-    name: Build container images
+    name: Release container image
     needs: [zizmor, test]
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-    env:
-      CACHIX_AUTH_TOKEN: ${{ secrets.CACHIX_AUTH_TOKEN }}
-      SHA: ${{ github.sha }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           persist-credentials: false
 
-      - name: Enable cache pushing
-        run: echo '{ cachix.push = "zeroecks-labeler"; }' > devenv.local.nix
-
       - name: Install Nix
         uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31
 
-      - name: Restore and save Nix store
-        # zizmor: ignore[cache-poisoning]
-        uses: nix-community/cache-nix-action@7df957e333c1e5da7721f60227dbba6d06080569 # v7
-        with:
-          primary-key: nix-${{ runner.os }}-${{ hashFiles('**/*.nix', '**/flake.lock', '**/devenv.lock', '**/devenv.yaml') }}
-          restore-prefixes-first-match: nix-${{ runner.os }}-
-          gc-max-store-size-linux: 3G
-          purge: true
-          purge-last-accessed: P3D
-          purge-primary-key: never
-
       - name: Set up Cachix
+        if: github.event_name == 'push'
         uses: cachix/cachix-action@5f2d7c5294214f71b873db4b969586b980625e71 # v17
         with:
           name: zeroecks-labeler
-          extraPullNames: devenv
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
-
-      - name: Install devenv
-        run: nix profile add nixpkgs#devenv
-
-      - name: Build the container
-        if: github.event_name != 'push'
-        run: |
-          devenv container build labeler \
-            --option containers.labeler.version:string "${SHA}"
 
       - name: Log in to GHCR
         if: github.event_name == 'push'
@@ -135,21 +78,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Push the Cloudron nightly image
+      - name: Push image and retag as release if appropriate
         if: github.event_name == 'push'
         run: |
-          devenv container copy labeler \
-            --option containers.labeler.version:string "${SHA}" \
-            --registry docker://ghcr.io/zeroecks/
-
-  retag:
-    name: Retag release version (if tagged)
-    needs: [container]
-    if: github.event_name == 'push'
-    permissions:
-      actions: read
-      contents: read
-      packages: write
-    uses: ./.github/workflows/release-tag.yml
-    with:
-      sha: ${{ github.sha }}
+          nix shell .#ci -c build-image-push-image-tag-release
