@@ -45,7 +45,7 @@ jobs:
 
       - name: Check flake (formatting, tests)
         run: |
-          nix flake check
+          nix flake check --accept-flake-config
 
   container:
     name: Release container image
@@ -81,4 +81,4 @@ jobs:
       - name: Push image and retag as release if appropriate
         if: github.event_name == 'push'
         run: |
-          nix shell .#ci -c build-image-push-image-tag-release
+          nix shell .#ci -c build-image-push-image-tag-release --accept-flake-config
