@@ -1,7 +1,7 @@
 {
   "id": "blue.melody.labeler",
-  "version": "0.3.2",
-  "upstreamVersion": "0.3.2",
+  "version": "0.3.3",
+  "upstreamVersion": "0.3.3",
   "minBoxVersion": "9.1.0",
   "title": "Labeler",
   "author": "Melody Kelly",
@@ -11,11 +11,15 @@
   "packagerName": "Melody",
   "packagerUrl": "https://melody.blue",
   "contactEmail": "labeler@melody.blue",
-  "iconUrl": "https://raw.githubusercontent.com/ZeroEcks/labeler/v0.3.2/assets/labeler.png",
+  "iconUrl": "https://raw.githubusercontent.com/ZeroEcks/labeler/v0.3.3/assets/labeler.png",
   "healthCheckPath": "/healthz",
-  "mediaLinks": ["https://raw.githubusercontent.com/ZeroEcks/labeler/v0.3.2/assets/labeler.png"],
+  "mediaLinks": [
+    "https://raw.githubusercontent.com/ZeroEcks/labeler/v0.3.3/assets/labeler.png"
+  ],
   "httpPort": 3000,
-  "tags": ["stripe"],
+  "tags": [
+    "stripe"
+  ],
   "changelog": "file://CHANGELOG",
   "postInstallMessage": "file://POSTINSTALL.md",
   "documentationUrl": "https://github.com/zeroecks/labeler",

@@ -1,3 +1,6 @@
+[0.3.3]
+* feat: move to flake instead of devenv, mostly for speed reasons (8849bd7)
+
 [0.3.2]
 * fix: release workflow was wrong (68782dd)
 * fix: setup-crane had the wrong if (5445ddf)
