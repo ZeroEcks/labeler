@@ -14,7 +14,7 @@
   "iconUrl": "https://raw.githubusercontent.com/ZeroEcks/labeler/v0.5.0/assets/labeler.png",
   "healthCheckPath": "/healthz",
   "mediaLinks": [
-    "https://raw.githubusercontent.com/ZeroEcks/labeler/v0.5.0/assets/labeler.png"
+    "https://raw.githubusercontent.com/ZeroEcks/labeler/v0.5.0/assets/media-links-1.png"
   ],
   "httpPort": 3000,
   "tags": [
