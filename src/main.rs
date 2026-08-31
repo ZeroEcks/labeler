@@ -53,6 +53,7 @@ async fn main() {
     let logged_routes = Router::new()
         .route("/", get(root))
         .route("/report/pdf", get(report))
+        .route("/report/table", get(report_table))
         .route("/report/csv", get(report_csv))
         .layer(
             TraceLayer::new_for_http()
@@ -79,7 +80,7 @@ async fn healthz(State(_state): State<AppState>) -> Result<String, (StatusCode, 
 }
 
 /// Serves the index page: a Pico CSS form for choosing a report start date
-/// (defaulting to exactly two months ago), a live PDF preview of the
+/// (defaulting to exactly two months ago), a live table preview of the
 /// shipping-label report for that date, and links to download the PDF or a
 /// CSV export from `/report/pdf` and `/report/csv`.
 async fn root() -> impl IntoResponse {
@@ -211,6 +212,35 @@ async fn report_csv(
         ],
         csv,
     ))
+}
+
+/// Renders the same subscriptions as [`report_csv`] as an HTML `<table>`
+/// fragment (one row per subscription, same columns: name, address,
+/// subscription start date, subscription amount, last payment date), for
+/// the index page's live preview.
+#[tracing::instrument(skip(state), fields(start_date = %query.start_date))]
+async fn report_table(
+    State(state): State<AppState>,
+    Query(query): Query<ReportQuery>,
+) -> Result<impl IntoResponse, (StatusCode, String)> {
+    let start_date = parse_start_date(&query.start_date)?;
+    let now = Utc::now().timestamp();
+    tracing::trace!(start_date, now, "resolved report window");
+
+    let subscriptions = subscriptions_active_between(state.stripe.as_ref(), start_date, now)
+        .await
+        .map_err(|err| {
+            (
+                StatusCode::BAD_GATEWAY,
+                format!("Stripe API call failed: {err}"),
+            )
+        })?;
+    tracing::debug!(
+        subscription_count = subscriptions.len(),
+        "fetched subscriptions active in period"
+    );
+
+    Ok(Html(render_subscriptions_table_html(&subscriptions)))
 }
 
 /// Parses a `YYYY-MM-DD` `start_date` query value into a Unix timestamp at
@@ -554,6 +584,48 @@ fn render_subscriptions_csv(subscriptions: &[Subscription]) -> String {
     csv
 }
 
+/// Renders `subscriptions` as an HTML `<table>` fragment with the same
+/// columns and row semantics as [`render_subscriptions_csv`] (name,
+/// address, subscription start date, subscription amount, last payment
+/// date), for the index page's live preview. Every cell is HTML-escaped
+/// since names and addresses come from Stripe customer data.
+fn render_subscriptions_table_html(subscriptions: &[Subscription]) -> String {
+    let mut html = String::from(
+        "<table><thead><tr><th>Name</th><th>Address</th><th>Subscription start</th>\
+         <th>Amount</th><th>Last payment</th></tr></thead><tbody>",
+    );
+    for subscription in subscriptions {
+        let Some(customer) = subscription.customer.as_object() else {
+            continue;
+        };
+        let name = customer
+            .name
+            .as_deref()
+            .or(customer.email.as_deref())
+            .unwrap_or(customer.id.as_str());
+        let address = customer
+            .address
+            .as_ref()
+            .map(format_address_single_line)
+            .unwrap_or_default();
+        let last_payment_date = last_payment_date(subscription)
+            .map(format_date)
+            .unwrap_or_default();
+
+        let _ = write!(
+            html,
+            "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
+            html_escape(name),
+            html_escape(&address),
+            html_escape(&format_date(subscription.start_date)),
+            html_escape(&subscription_amount(subscription)),
+            html_escape(&last_payment_date),
+        );
+    }
+    html.push_str("</tbody></table>");
+    html
+}
+
 /// The time a subscription's most recent invoice (`latest_invoice`) was
 /// paid, or `None` if it hasn't expanded to an invoice or that invoice has
 /// never been paid (e.g. still open, or the subscription has no invoices
@@ -621,6 +693,17 @@ fn csv_field(value: &str) -> String {
     } else {
         value.to_string()
     }
+}
+
+/// Escapes a value for embedding as HTML text content, for the table
+/// preview cells.
+fn html_escape(value: &str) -> String {
+    value
+        .replace('&', "&amp;")
+        .replace('<', "&lt;")
+        .replace('>', "&gt;")
+        .replace('"', "&quot;")
+        .replace('\'', "&#39;")
 }
 
 #[cfg(test)]
