@@ -13,7 +13,6 @@ in
           ../../Cargo.lock
           ../../secretspec.toml
           ../../src
-          ../../templates
         ];
       };
 

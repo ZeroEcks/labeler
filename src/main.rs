@@ -101,7 +101,7 @@ async fn root() -> impl IntoResponse {
 /// The index page template, loaded from disk at compile time.
 /// `%%DEFAULT_DATE%%` (two months before today) and `%%TODAY%%` are filled
 /// in by [`root`].
-const INDEX_HTML_TEMPLATE: &str = include_str!("../templates/index.html");
+const INDEX_HTML_TEMPLATE: &str = include_str!("./templates/index.html");
 
 /// Query parameters for `/report`. `start_date` (`YYYY-MM-DD`) marks the
 /// beginning of the reporting period; the period runs from that date until
@@ -344,7 +344,7 @@ const LABELS_PER_PAGE: usize = 14;
 /// The label sheet Typst template, loaded from disk at compile time. It
 /// defines the Avery L7163-compatible page geometry and a `shipping-label`
 /// function, and lays out `sys.inputs.pages` (see [`ReportInput`]).
-const LABEL_SHEET_TEMPLATE: &str = include_str!("../templates/shipping_labels.typ");
+const LABEL_SHEET_TEMPLATE: &str = include_str!("./templates/shipping_labels.typ");
 
 /// Builds a [`TypstEngine`] for rendering the label sheet template, with
 /// Typst's default fonts (New Computer Modern) embedded at compile time via
