@@ -24,7 +24,6 @@
   "postInstallMessage": "file://POSTINSTALL.md",
   "documentationUrl": "https://github.com/zeroecks/labeler",
   "addons": {
-    "localstorage": {},
     "proxyAuth": {}
   },
   "manifestVersion": 2
