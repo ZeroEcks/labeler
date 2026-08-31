@@ -1,3 +1,7 @@
+[0.5.0]
+* feat: add last paid and human readable country names (9179b83)
+* chore: move templates into src/ dir for simplification (93501f3)
+
 [0.4.0]
 * fix: fetch the tags so we know to do a release (4851d4d)
 * fix: accept flake config in ci (e7341fd)
