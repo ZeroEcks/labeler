@@ -1,3 +1,7 @@
+[0.4.0]
+* fix: fetch the tags so we know to do a release (4851d4d)
+* fix: accept flake config in ci (e7341fd)
+
 [0.3.3]
 * feat: move to flake instead of devenv, mostly for speed reasons (8849bd7)
 
