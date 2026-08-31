@@ -1,3 +1,6 @@
+[0.7.0]
+* feat: add search, count etc (41b0627)
+
 [0.6.0]
 * feat: add table instead of pdf preview (d008ad4)
 * feat: add medialink (4211be9)
