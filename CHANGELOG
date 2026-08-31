@@ -1,3 +1,7 @@
+[0.6.0]
+* feat: add table instead of pdf preview (d008ad4)
+* feat: add medialink (4211be9)
+
 [0.5.0]
 * feat: add last paid and human readable country names (9179b83)
 * chore: move templates into src/ dir for simplification (93501f3)
