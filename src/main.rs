@@ -52,7 +52,7 @@ async fn main() {
     // useful information, so it's kept off the access-log router entirely.
     let logged_routes = Router::new()
         .route("/", get(root))
-        .route("/report", get(report))
+        .route("/report/pdf", get(report))
         .route("/report/csv", get(report_csv))
         .layer(
             TraceLayer::new_for_http()
@@ -81,7 +81,7 @@ async fn healthz(State(_state): State<AppState>) -> Result<String, (StatusCode, 
 /// Serves the index page: a Pico CSS form for choosing a report start date
 /// (defaulting to exactly two months ago), a live PDF preview of the
 /// shipping-label report for that date, and links to download the PDF or a
-/// CSV export from `/report` and `/report/csv`.
+/// CSV export from `/report/pdf` and `/report/csv`.
 async fn root() -> impl IntoResponse {
     let default_date = Utc::now()
         .date_naive()
@@ -103,7 +103,7 @@ async fn root() -> impl IntoResponse {
 /// in by [`root`].
 const INDEX_HTML_TEMPLATE: &str = include_str!("./templates/index.html");
 
-/// Query parameters for `/report`. `start_date` (`YYYY-MM-DD`) marks the
+/// Query parameters for `/report/pdf`. `start_date` (`YYYY-MM-DD`) marks the
 /// beginning of the reporting period; the period runs from that date until
 /// now.
 #[derive(Debug, Deserialize)]
@@ -172,9 +172,11 @@ async fn report(
 
 /// Exports the same customers as [`report`], one row per subscription that
 /// overlapped `[start_date, now]`, as CSV with columns
-/// `name,address,sub_start_date,sub_amount`. `sub_amount` is the
-/// subscription's per-cycle total (sum of `unit_amount * quantity` across
-/// its items) in major currency units (e.g. dollars, not cents).
+/// `name,address,sub_start_date,sub_amount,last_payment_date`. `sub_amount`
+/// is the subscription's per-cycle total (sum of `unit_amount * quantity`
+/// across its items) in major currency units (e.g. dollars, not cents).
+/// `last_payment_date` is when its most recent invoice was paid, blank if
+/// that invoice has never been paid.
 #[tracing::instrument(skip(state), fields(start_date = %query.start_date))]
 async fn report_csv(
     State(state): State<AppState>,
@@ -242,7 +244,10 @@ async fn subscriptions_active_between(
     loop {
         let mut request = ListSubscription::new()
             .status(ListSubscriptionStatus::All)
-            .expand(vec!["data.customer".to_string()])
+            .expand(vec![
+                "data.customer".to_string(),
+                "data.latest_invoice".to_string(),
+            ])
             .limit(100);
         if let Some(cursor) = starting_after.take() {
             request = request.starting_after(cursor);
@@ -494,7 +499,13 @@ fn address_lines(address: &Address) -> Vec<String> {
     }
 
     if let Some(country) = non_empty(address.country.as_deref()) {
-        lines.push(country.to_string());
+        if let Some(country_code) = rust_iso3166::from_alpha2(country) {
+            // We could convert a code to human readable (AU -> Australia)
+            lines.push(country_code.name.to_string());
+        } else {
+            // We couldn't, just put in the two letter code
+            lines.push(country.to_string());
+        }
     }
 
     lines
@@ -506,11 +517,12 @@ fn non_empty(value: Option<&str>) -> Option<&str> {
 }
 
 /// Renders `subscriptions` as CSV with columns
-/// `name,address,sub_start_date,sub_amount`, one row per subscription (so a
-/// customer with multiple overlapping subscriptions gets multiple rows).
-/// Subscriptions whose customer failed to expand are skipped.
+/// `name,address,sub_start_date,sub_amount,last_payment_date`, one row per
+/// subscription (so a customer with multiple overlapping subscriptions gets
+/// multiple rows). Subscriptions whose customer failed to expand are
+/// skipped.
 fn render_subscriptions_csv(subscriptions: &[Subscription]) -> String {
-    let mut csv = String::from("name,address,sub_start_date,sub_amount\n");
+    let mut csv = String::from("name,address,sub_start_date,sub_amount,last_payment_date\n");
     for subscription in subscriptions {
         let Some(customer) = subscription.customer.as_object() else {
             continue;
@@ -525,17 +537,34 @@ fn render_subscriptions_csv(subscriptions: &[Subscription]) -> String {
             .as_ref()
             .map(format_address_single_line)
             .unwrap_or_default();
+        let last_payment_date = last_payment_date(subscription)
+            .map(format_date)
+            .unwrap_or_default();
 
         let _ = writeln!(
             csv,
-            "{},{},{},{}",
+            "{},{},{},{},{}",
             csv_field(name),
             csv_field(&address),
             csv_field(&format_date(subscription.start_date)),
             csv_field(&subscription_amount(subscription)),
+            csv_field(&last_payment_date),
         );
     }
     csv
+}
+
+/// The time a subscription's most recent invoice (`latest_invoice`) was
+/// paid, or `None` if it hasn't expanded to an invoice or that invoice has
+/// never been paid (e.g. still open, or the subscription has no invoices
+/// yet).
+fn last_payment_date(subscription: &Subscription) -> Option<i64> {
+    subscription
+        .latest_invoice
+        .as_ref()?
+        .as_object()?
+        .status_transitions
+        .paid_at
 }
 
 /// Renders a customer's address as a single comma-separated line (street

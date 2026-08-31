@@ -40,6 +40,7 @@ typst-as-lib = { version = "0.16", features = [
   "typst-kit-fonts",
   "typst-kit-embed-fonts",
 ] }
+rust_iso3166 = "0.2.0"
 
 [dev-dependencies]
 lopdf = { version = "0.44.0", default-features = false }

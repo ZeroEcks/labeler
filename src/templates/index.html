@@ -38,9 +38,9 @@
 
     function update() {
       const startDate = encodeURIComponent(dateInput.value);
-      getReport.href = `/report?start_date=${startDate}`;
+      getReport.href = `/report/pdf?start_date=${startDate}`;
       exportCsv.href = `/report/csv?start_date=${startDate}`;
-      preview.src = `/report?start_date=${startDate}`;
+      preview.src = `/report/pdf?start_date=${startDate}`;
     }
 
     dateInput.addEventListener("change", update);
