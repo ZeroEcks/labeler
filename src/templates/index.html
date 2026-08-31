@@ -27,7 +27,15 @@
     </div>
 
     <h2>Preview</h2>
-    <div id="preview"></div>
+    <input
+      type="search"
+      id="preview-search"
+      placeholder="Filter preview…"
+      aria-label="Filter preview"
+      disabled
+    />
+    <p id="preview-count"></p>
+    <div id="preview" aria-busy="true">Loading preview…</div>
   </main>
 
   <script>
@@ -35,11 +43,35 @@
     const getReport = document.getElementById("get-report");
     const exportCsv = document.getElementById("export-csv");
     const preview = document.getElementById("preview");
+    const previewSearch = document.getElementById("preview-search");
+    const previewCount = document.getElementById("preview-count");
+
+    let previewRows = [];
+
+    function applyFilter() {
+      const term = previewSearch.value.trim().toLowerCase();
+      let visible = 0;
+      for (const row of previewRows) {
+        const match = !term || row.textContent.toLowerCase().includes(term);
+        row.style.display = match ? "" : "none";
+        if (match) visible++;
+      }
+      previewCount.textContent = term
+        ? `${visible} of ${previewRows.length} subscriptions`
+        : `${previewRows.length} subscription${previewRows.length === 1 ? "" : "s"}`;
+    }
 
     function update() {
       const startDate = encodeURIComponent(dateInput.value);
       getReport.href = `/report/pdf?start_date=${startDate}`;
       exportCsv.href = `/report/csv?start_date=${startDate}`;
+
+      previewRows = [];
+      previewSearch.disabled = true;
+      previewCount.textContent = "";
+      preview.setAttribute("aria-busy", "true");
+      preview.innerHTML = "Loading preview…";
+
       fetch(`/report/table?start_date=${startDate}`)
         .then((response) => {
           if (!response.ok) {
@@ -48,13 +80,23 @@
           return response.text();
         })
         .then((html) => {
+          preview.removeAttribute("aria-busy");
           preview.innerHTML = html;
+          previewRows = Array.from(preview.querySelectorAll("tbody tr"));
+          previewSearch.disabled = false;
+          previewSearch.value = "";
+          applyFilter();
         })
         .catch((err) => {
+          preview.removeAttribute("aria-busy");
           preview.innerHTML = `<p>Failed to load preview: ${err.message}</p>`;
+          previewRows = [];
+          previewCount.textContent = "";
+          previewSearch.disabled = true;
         });
     }
 
+    previewSearch.addEventListener("input", applyFilter);
     dateInput.addEventListener("change", update);
     update();
   </script>
