@@ -28,7 +28,7 @@ axum = { version = "0.8.9", features = ["http2"] }
 # structured logging: access-log middleware + trace-level spans/events
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-tower-http = { version = "0.6", features = ["trace"] }
+tower-http = { version = "0.7", features = ["trace"] }
 # Typst -> PDF rendering for the /report endpoint. `typst-kit-embed-fonts`
 # bakes typst's default fonts (New Computer Modern, via `typst-assets`) into
 # the binary at compile time, so rendering needs no network or system font
