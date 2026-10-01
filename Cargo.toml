@@ -10,7 +10,7 @@ unsafe-derive-deserialize = "allow"
 [dependencies]
 # secrets for dev & prod
 secretspec = { version = "0.19.1", default-features = false }
-secretspec-derive = "0.19.1"
+secretspec-derive = "0.21.0"
 # required directly by secretspec_derive::declare_secrets! generated code
 serde = { version = "1", features = ["derive"] }
 secrecy = "0.10"
